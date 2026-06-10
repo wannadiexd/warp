@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Warp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08080C;--surface:#0F0F18;--card:#141420;
+  --border:#1C1C2E;--border-hi:#272740;
+  --accent:#7C6FFF;--accent2:#00E5FF;--accent-glow:#7C6FFF33;
+  --text:#EEEEF5;--muted:#555570;--dim:#333350;
+  --ok:#00FFB2;--err:#FF4466;
+  --mono:'Space Mono',monospace;--sans:'Space Grotesk',sans-serif;
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 100% 50% at 50% 0%,black 20%,transparent 100%);
+  pointer-events:none;
+}
+
+body::after{
+  content:'';position:fixed;top:-120px;left:50%;transform:translateX(-50%);
+  width:600px;height:300px;z-index:0;
+  background:radial-gradient(ellipse,#7C6FFF18 0%,transparent 70%);
+  pointer-events:none;
+}
+
+.app{position:relative;z-index:1;max-width:660px;margin:0 auto;padding:24px 16px 80px}
+
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:36px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-name{font-family:var(--mono);font-size:1.05rem;font-weight:700;color:var(--text);letter-spacing:.04em}
+.badge{
+  display:flex;align-items:center;
+  font-family:var(--mono);font-size:.68rem;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);
+  padding:5px 11px;border-radius:20px;
+}
+
+.qr-panel{
+  background:var(--surface);border:1px solid var(--border-hi);
+  border-radius:14px;padding:18px;margin-bottom:18px;
+  display:none;gap:18px;align-items:center;
+}
+.qr-panel.show{display:flex}
+.qr-box{
+  flex-shrink:0;width:96px;height:96px;
+  background:var(--bg);
+  border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+}
+.qr-box img{width:100%;height:100%;object-fit:contain;display:block}
+.qr-right{flex:1;min-width:0}
+.qr-label{font-family:var(--mono);font-size:.62rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.qr-url{font-family:var(--mono);font-size:.82rem;color:var(--accent2);word-break:break-all;margin-bottom:10px}
+.copy-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:.68rem;
+  background:var(--border);border:none;border-radius:6px;
+  color:var(--text);padding:5px 10px;cursor:pointer;transition:background .15s;
+}
+.copy-btn:hover{background:var(--border-hi)}
+.copy-btn.ok{color:var(--ok)}
+
+.drop-zone{
+  border:1.5px dashed var(--border-hi);border-radius:14px;
+  padding:44px 20px;text-align:center;cursor:pointer;
+  position:relative;overflow:hidden;margin-bottom:18px;
+  transition:border-color .2s,background .2s;
+}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:var(--accent-glow)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{
+  width:52px;height:52px;margin:0 auto 14px;
+  background:var(--border);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s;
+}
+.drop-zone:hover .drop-icon,.drop-zone.over .drop-icon{background:var(--accent-glow)}
+.drop-title{font-size:.95rem;font-weight:500;margin-bottom:4px}
+.drop-sub{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+.prog-wrap{display:none;margin-bottom:18px}
+.prog-wrap.show{display:block}
+.prog-head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.7rem;color:var(--muted);margin-bottom:7px}
+.prog-track{height:2px;background:var(--border);border-radius:2px;overflow:visible;position:relative}
+.prog-bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:2px;transition:width .1s ease;position:relative;
+}
+.prog-bar::after{
+  content:'';position:absolute;right:-3px;top:50%;transform:translateY(-50%);
+  width:7px;height:7px;border-radius:50%;
+  background:var(--accent2);box-shadow:0 0 10px var(--accent2);
+}
+
+.warp-lines{height:28px;overflow:hidden;margin-top:10px;opacity:0;transition:opacity .3s}
+.warp-lines.active{opacity:1}
+.warp-lines svg{width:100%;height:28px}
+.wl{fill:none;stroke-linecap:round;opacity:0}
+.warp-lines.active .wl{animation:wline 1s ease-out infinite}
+.wl:nth-child(1){stroke:var(--accent);stroke-width:1.5;animation-delay:0s}
+.wl:nth-child(2){stroke:var(--accent2);stroke-width:1;animation-delay:.15s}
+.wl:nth-child(3){stroke:var(--accent);stroke-width:.6;animation-delay:.3s}
+@keyframes wline{
+  0%  {opacity:0;stroke-dashoffset:400}
+  20% {opacity:.9}
+  100%{opacity:0;stroke-dashoffset:0}
+}
+
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sec-title{font-family:var(--mono);font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sec-right{display:flex;align-items:center;gap:8px}
+.folder-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:.65rem;color:var(--muted);
+  background:none;border:1px solid var(--border);border-radius:6px;
+  padding:4px 8px;cursor:pointer;transition:border-color .2s,color .2s;
+}
+.folder-btn:hover{border-color:var(--border-hi);color:var(--text)}
+.file-count{font-family:var(--mono);font-size:.68rem;color:var(--accent)}
+
+.file-list{display:flex;flex-direction:column;gap:7px}
+.file-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:11px 13px;
+  display:flex;align-items:center;gap:11px;
+  transition:border-color .2s,transform .15s;
+  animation:fadein .2s ease both;
+}
+.file-card:hover{border-color:var(--border-hi);transform:translateX(2px)}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ext{
+  flex-shrink:0;width:36px;height:36px;border-radius:7px;
+  background:var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:.55rem;font-weight:700;
+  color:var(--accent);letter-spacing:.03em;text-transform:uppercase;
+}
+.finfo{flex:1;min-width:0}
+.fname{font-size:.84rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.fmeta{font-family:var(--mono);font-size:.65rem;color:var(--muted)}
+.fbtns{display:flex;gap:5px}
+.ibtn{
+  width:30px;height:30px;border-radius:7px;background:var(--border);
+  border:none;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:background .15s,color .15s;color:var(--muted);
+  text-decoration:none;flex-shrink:0;
+}
+.ibtn.dl:hover{background:#00E5FF1A;color:var(--accent2)}
+.ibtn.del:hover{background:#FF44661A;color:var(--err)}
+
+.empty{text-align:center;padding:44px 20px;font-family:var(--mono);font-size:.75rem;color:var(--dim);line-height:2}
+
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(6px);
+  background:var(--card);border:1px solid var(--border-hi);
+  border-radius:20px;padding:9px 16px;
+  font-family:var(--mono);font-size:.75rem;color:var(--text);
+  display:flex;align-items:center;gap:7px;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+  z-index:999;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.tdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.toast.ok .tdot{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.toast.err .tdot{background:var(--err);box-shadow:0 0 6px var(--err)}
+.copy-btn img, .drop-icon img, .logo img, .ibtn img {
+  filter: brightness(0) invert(1);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <img src="/warp.png" style="width:34px;height:34px;border-radius:9px;" alt="Warp"/>
+      <div class="logo-name">WARP</div>
+    </div>
+  </header>
+
+  <div class="qr-panel" id="qrPanel">
+    <div class="qr-box"><img id="qrImg" src="" alt="QR"/></div>
+    <div class="qr-right">
+      <div class="qr-label">Scan with phone</div>
+      <div class="qr-url" id="qrUrl">—</div>
+      <button class="copy-btn" id="copyBtn" onclick="copyUrl()">
+        <img src="/copy.png" width="11" height="11" alt="Copy"/>Copy link
+      </button>
+    </div>
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" multiple/>
+    <div class="drop-icon">
+      <img src="/upload.png" width="22" height="22" alt="Upload"/>
+    </div>
+    <div class="drop-title">Drop files here</div>
+    <div class="drop-sub">or click/tap to choose</div>
+  </div>
+
+  <div class="prog-wrap" id="progWrap">
+    <div class="prog-head"><span id="progLabel">Uploading…</span><span id="progPct">0%</span></div>
+    <div class="prog-track"><div class="prog-bar" id="progBar"></div></div>
+    <div class="warp-lines" id="warpLines">
+      <svg viewBox="0 0 500 28" preserveAspectRatio="none">
+        <path class="wl" stroke-dasharray="400" stroke-dashoffset="400" d="M0,14 Q125,4 250,14 T500,14"/>
+        <path class="wl" stroke-dasharray="400" stroke-dashoffset="400" d="M0,14 Q125,22 250,14 T500,14"/>
+        <path class="wl" stroke-dasharray="400" stroke-dashoffset="400" d="M0,14 Q250,8 500,14"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="sec-head">
+    <div class="sec-title">Files</div>
+    <div class="sec-right">
+      <button class="folder-btn" id="folderBtn" style="display:none" onclick="openFolder()">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M1 3a1 1 0 011-1h2.5l1 1H10a1 1 0 011 1v5a1 1 0 01-1 1H2a1 1 0 01-1-1V3z" stroke="currentColor" stroke-width="1.1"/>
+        </svg>Open folder
+      </button>
+      <span class="file-count" id="fileCount">—</span>
+    </div>
+  </div>
+  <div class="file-list" id="fileList"></div>
+
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+let serverUrl = '';
+const isPC = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+async function init() {
+  try {
+    const d = await fetch('/api/info').then(r => r.json());
+    serverUrl = d.url;
+    if (isPC) {
+      const panel = document.getElementById('qrPanel');
+      panel.classList.add('show');
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=192x192&color=7C6FFF&bgcolor=08080C&data=${encodeURIComponent(d.url)}`;
+      document.getElementById('qrImg').src = qrUrl;
+      document.getElementById('qrUrl').textContent = d.url;
+      document.getElementById('folderBtn').style.display = 'inline-flex';
+    }
+    renderFiles(d.files);
+  } catch(e) {
+    document.getElementById('badgeText').textContent = 'offline';
+  }
+}
+
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+  return (b/1073741824).toFixed(2) + ' GB';
+}
+function ext(name) {
+  const p = name.split('.'); return p.length > 1 ? p.pop().slice(0,4).toUpperCase() : 'FILE';
+}
+function renderFiles(files) {
+  document.getElementById('fileCount').textContent = `${files.length} file${files.length!==1?'s':''}`;
+  const list = document.getElementById('fileList');
+  if (!files.length) {
+    list.innerHTML = '<div class="empty">// nothing here yet<br>drop something above ↑</div>'; return;
+  }
+  list.innerHTML = files.map(f => `
+    <div class="file-card">
+      <div class="ext">${ext(f.name)}</div>
+      <div class="finfo">
+        <div class="fname">${f.name}</div>
+        <div class="fmeta">${fmtSize(f.size)}</div>
+      </div>
+      <div class="fbtns">
+        <a class="ibtn dl" href="/api/download/${encodeURIComponent(f.name)}" download="${f.name}" title="Download">
+          <img src="/download.png" width="13" height="13" alt="Download"/>
+        </a>
+        <button class="ibtn del" title="Delete" onclick="del('${f.name.replace(/'/g,"\\'")}')">
+          <img src="/delete.png" width="13" height="13" alt="Delete"/>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+async function refresh() {
+  const d = await fetch('/api/info').then(r => r.json());
+  renderFiles(d.files);
+}
+
+async function del(name) {
+  await fetch(`/api/delete/${encodeURIComponent(name)}`, {method:'DELETE'});
+  toast(`Deleted`, 'ok'); refresh();
+}
+
+async function openFolder() { fetch('/api/open-folder'); }
+
+async function upload(files) {
+  if (!files.length) return;
+  const pw = document.getElementById('progWrap');
+  const bar = document.getElementById('progBar');
+  const pct = document.getElementById('progPct');
+  const lbl = document.getElementById('progLabel');
+  const wl  = document.getElementById('warpLines');
+  pw.classList.add('show'); wl.classList.add('active');
+
+  const fd = new FormData();
+  [...files].forEach(f => fd.append('files', f));
+
+  await new Promise((res, rej) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
+    xhr.upload.onprogress = e => {
+      if (!e.lengthComputable) return;
+      const p = Math.round(e.loaded/e.total*100);
+      bar.style.width = p+'%'; pct.textContent = p+'%';
+    };
+    xhr.onload  = () => xhr.status < 400 ? res() : rej();
+    xhr.onerror = rej;
+    xhr.send(fd);
+  }).catch(() => toast('Upload failed','err'));
+
+  bar.style.width = '100%'; lbl.textContent = 'Done ✓';
+  toast('Uploaded successfully','ok');
+  setTimeout(() => {
+    pw.classList.remove('show'); wl.classList.remove('active');
+    bar.style.width='0%'; pct.textContent='0%'; lbl.textContent='Uploading…';
+  }, 1400);
+  refresh();
+}
+
+function copyUrl() {
+  if (!serverUrl) return;
+  navigator.clipboard.writeText(serverUrl).then(() => {
+    const b = document.getElementById('copyBtn');
+    b.classList.add('ok'); b.textContent = 'Copied!';
+    toast('Link copied','ok');
+    setTimeout(() => { b.classList.remove('ok'); b.innerHTML = `<img src="/copy.png" width="11" height="11" alt="Copy"/>Copy link`; }, 2000);
+  });
+}
+
+let tt;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  clearTimeout(tt);
+  el.className = `toast ${type} show`;
+  document.getElementById('toastMsg').textContent = msg;
+  tt = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+const zone = document.getElementById('dropZone');
+const inp  = document.getElementById('fileInput');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('over'); upload(e.dataTransfer.files); });
+inp.addEventListener('change', () => { upload(inp.files); inp.value=''; });
+
+init();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
